@@ -263,7 +263,7 @@ de l'hébergeur, puis déployer le dossier `dist/`.
 
 ## 👤 Auteur
 
-**Oussama Amri**
+**Oussema Amri**
 
 ## 📜 Licence
 
