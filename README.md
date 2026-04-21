@@ -25,6 +25,15 @@ capteurs ultrasons (HC-SR04) pilotés par un module Arduino + ESP8266.
 
 ---
 
+## 📌 Statut
+
+| Couche | État |
+|---|---|
+| Dashboard web | ✅ Complet |
+| Authentification & rôles | ✅ Complet |
+| Base de données Supabase | ✅ Complet |
+| Intégration IoT (Arduino + ESP8266) | 🔧 En cours |
+
 ## 🧱 Stack technique
 
 **Frontend**
@@ -184,6 +193,7 @@ smartpark/
 │   ├── config.toml
 │   └── migrations/            # Schéma SQL versionné
 ├── .env                       # Variables d'env
+├── .env.example               # Template des variables requises
 ├── tailwind.config.ts
 ├── vite.config.ts
 └── tsconfig.json
