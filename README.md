@@ -183,7 +183,7 @@ smartpark/
 ├── supabase/
 │   ├── config.toml
 │   └── migrations/            # Schéma SQL versionné
-├── .env                       # Variables d'env (à NE PAS commit)
+├── .env                       # Variables d'env
 ├── tailwind.config.ts
 ├── vite.config.ts
 └── tsconfig.json
