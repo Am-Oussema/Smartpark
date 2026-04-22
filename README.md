@@ -212,7 +212,7 @@ ESP8266. Le contrat d'intégration prévu :
    ```json
    { "spots": [
        { "id": 1, "status": "free" },
-       { "id": 2, "status": "occupied" },
+       { "id": 2, "status": "free" },
        { "id": 3, "status": "free" },
        { "id": 4, "status": "free" }
    ]}

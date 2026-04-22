@@ -30,7 +30,7 @@ export default function ForgotPassword() {
     // 1) Vérifier via une fonction sécurisée (SECURITY DEFINER) si l'email existe.
     //    Cette RPC renvoie juste true/false — pas de fuite de données, et fonctionne
     //    sans être connecté (contrairement à un SELECT direct bloqué par la RLS).
-    const { data: exists, error: checkError } = await supabase.rpc("email_exists", {
+    const { data: exists, error: checkError } = await supabase.rpc("email_exists" as any, {
       _email: email,
     });
 
