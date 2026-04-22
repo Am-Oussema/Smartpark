@@ -238,27 +238,6 @@ Stack : **Vitest + @testing-library/react + jsdom**. Setup global dans
 
 ---
 
-## 🚢 Déploiement
-
-### Vercel / Netlify / Cloudflare Pages
-
-```bash
-bun run build           # → dist/
-```
-
-Configurer les variables d'environnement (`VITE_SUPABASE_*`) dans le dashboard
-de l'hébergeur, puis déployer le dossier `dist/`.
-
-### Build command / Output directory
-
-| Champ | Valeur |
-|---|---|
-| Build command | `bun run build` |
-| Output directory | `dist` |
-| Node version | `≥ 18` |
-
----
-
 ## 🗺️ Roadmap
 
 - [ ] Edge function Supabase pour ingestion des capteurs ESP8266
