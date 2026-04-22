@@ -49,7 +49,7 @@ capteurs ultrasons (HC-SR04) pilotés par un module Arduino + ESP8266.
 
 **Outillage**
 - ESLint 9 (flat config) · Vitest + Testing Library + JSDOM
-- Bun ou npm · `lovable-tagger` (dev only)
+- Bun ou npm
 
 **IoT (cible matérielle)**
 - Arduino Uno + 4 × HC-SR04 (capteurs ultrasons)
