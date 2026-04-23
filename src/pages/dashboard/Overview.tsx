@@ -7,7 +7,7 @@ import { AnalyticsCharts } from "@/components/dashboard/AnalyticsCharts";
 import { AlertBanner } from "@/components/dashboard/AlertBanner";
 import { PricingPanel } from "@/components/dashboard/PricingPanel";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 export default function DashboardOverview() {

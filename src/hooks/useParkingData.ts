@@ -7,7 +7,7 @@
  * The components using this hook do not need to change.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { INITIAL_SPOTS, type ParkingSpot, type SpotStatus, BUSINESS_CONFIG } from "@/data/mockParking";
 import { toast } from "sonner";

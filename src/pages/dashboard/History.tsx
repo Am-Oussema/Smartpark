@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, History as HistoryIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
