@@ -19,39 +19,49 @@ export function useParkingData() {
   const alertedFullRef = useRef(false);
   const alertedThresholdRef = useRef(false);
 
-  // On mount: restore active reservations from DB into the map
-  useEffect(() => {
-    const restoreReservations = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("reservations")
-        .select("spot_number, expires_at")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .gt("expires_at", new Date().toISOString());
-      if (!data || data.length === 0) return;
-      setSpots((prev) =>
-        prev.map((s) => {
-          const match = data.find((r) => r.spot_number === s.id);
-          if (match) {
-            return { ...s, status: "reserved", reservedUntil: new Date(match.expires_at).getTime() };
-          }
-          return s;
-        })
-      );
-    };
-    restoreReservations();
+  // Restaure depuis la DB les réservations de l'utilisateur dont la plage
+  // horaire couvre l'instant présent (now ∈ [start_time, end_time)).
+  const refreshFromDb = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const nowIso = new Date().toISOString();
+    const { data } = await supabase
+      .from("reservations")
+      .select("spot_number, end_time")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .lte("start_time", nowIso)
+      .gt("end_time", nowIso);
+
+    setSpots((prev) =>
+      prev.map((s) => {
+        const match = data?.find((r) => r.spot_number === s.id);
+        if (match) {
+          return { ...s, status: "reserved", reservedUntil: new Date(match.end_time).getTime() };
+        }
+        // si la place était marquée réservée par une ancienne session mais n'est plus
+        // dans la liste des réservations actives, on la libère
+        if (s.status === "reserved" && !match) {
+          return { ...s, status: "free", reservedUntil: undefined };
+        }
+        return s;
+      }),
+    );
   }, []);
 
-  // KPIs
+  useEffect(() => {
+    refreshFromDb();
+    const i = setInterval(refreshFromDb, 30_000);
+    return () => clearInterval(i);
+  }, [refreshFromDb]);
+
   const total = spots.length;
   const occupied = spots.filter((s) => s.status === "occupied").length;
   const reserved = spots.filter((s) => s.status === "reserved").length;
   const free = spots.filter((s) => s.status === "free").length;
   const occupancyRate = Math.round(((occupied + reserved) / total) * 100);
 
-  // Dynamic pricing
   const currentPrice = useMemo(() => {
     const surge = occupancyRate >= BUSINESS_CONFIG.surgeThreshold;
     return {
@@ -63,7 +73,6 @@ export function useParkingData() {
     };
   }, [occupancyRate]);
 
-  // Alerts
   useEffect(() => {
     if (occupancyRate >= 100 && !alertedFullRef.current) {
       toast.error("🚨 Parking complet !", { description: "Aucune place disponible." });
@@ -86,15 +95,15 @@ export function useParkingData() {
     }
   }, [occupancyRate]);
 
-  // Reservation timers — auto-release after 5 min
+  // Libération automatique quand la fin de réservation est atteinte
   useEffect(() => {
     const interval = setInterval(() => {
       setSpots((prev) =>
         prev.map((s) =>
           s.status === "reserved" && s.reservedUntil && s.reservedUntil < Date.now()
             ? { ...s, status: "free", reservedUntil: undefined }
-            : s
-        )
+            : s,
+        ),
       );
     }, 1000);
     return () => clearInterval(interval);
@@ -102,23 +111,25 @@ export function useParkingData() {
 
   const setSpotStatus = useCallback((id: number, status: SpotStatus) => {
     setSpots((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status, reservedUntil: undefined } : s))
+      prev.map((s) => (s.id === id ? { ...s, status, reservedUntil: undefined } : s)),
     );
   }, []);
 
-  const reserveSpot = useCallback((id: number, durationMs = 5 * 60 * 1000) => {
+  // Marque une place comme réservée jusqu'à un timestamp donné (ms).
+  // Utilisé par les pages quand une réservation couvrant l'instant présent est créée.
+  const reserveSpotRange = useCallback((id: number, untilMs: number) => {
     setSpots((prev) =>
       prev.map((s) =>
         s.id === id && s.status === "free"
-          ? { ...s, status: "reserved", reservedUntil: Date.now() + durationMs }
-          : s
-      )
+          ? { ...s, status: "reserved", reservedUntil: untilMs }
+          : s,
+      ),
     );
   }, []);
 
   const cancelReservation = useCallback((id: number) => {
     setSpots((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "free", reservedUntil: undefined } : s))
+      prev.map((s) => (s.id === id ? { ...s, status: "free", reservedUntil: undefined } : s)),
     );
   }, []);
 
@@ -155,9 +166,10 @@ export function useParkingData() {
     exits,
     currentPrice,
     setSpotStatus,
-    reserveSpot,
+    reserveSpotRange,
     cancelReservation,
     simulateEntry,
     simulateExit,
+    refreshFromDb,
   };
 }

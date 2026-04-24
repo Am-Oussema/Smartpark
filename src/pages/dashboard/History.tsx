@@ -10,7 +10,8 @@ interface Row {
   spot_number: number;
   status: string;
   reserved_at: string;
-  expires_at: string;
+  start_time: string;
+  end_time: string;
   cancelled_at: string | null;
 }
 
@@ -20,6 +21,17 @@ const statusLabel: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Annulée", cls: "bg-destructive/15 text-destructive" },
   completed: { label: "Terminée", cls: "bg-success/15 text-success" },
 };
+
+function formatDuration(startIso: string, endIso: string) {
+  const minutes = Math.round(
+    (new Date(endIso).getTime() - new Date(startIso).getTime()) / 60_000,
+  );
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
+}
 
 export default function History() {
   const { user } = useAuth();
@@ -34,13 +46,13 @@ export default function History() {
         .update({ status: "expired" })
         .eq("user_id", user.id)
         .eq("status", "active")
-        .lt("expires_at", new Date().toISOString());
+        .lt("end_time", new Date().toISOString());
 
       const { data } = await supabase
         .from("reservations")
-        .select("id, spot_number, status, reserved_at, expires_at, cancelled_at")
+        .select("id, spot_number, status, reserved_at, start_time, end_time, cancelled_at")
         .eq("user_id", user.id)
-        .order("reserved_at", { ascending: false })
+        .order("start_time", { ascending: false })
         .limit(50);
       setRows(data ?? []);
       setLoading(false);
@@ -72,7 +84,9 @@ export default function History() {
             <thead className="bg-secondary/50 text-left text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Place</th>
-                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Début</th>
+                <th className="px-4 py-3">Fin</th>
+                <th className="px-4 py-3">Durée</th>
                 <th className="px-4 py-3">Statut</th>
               </tr>
             </thead>
@@ -83,10 +97,18 @@ export default function History() {
                   <tr key={r.id} className="border-t border-border">
                     <td className="px-4 py-3 font-medium">P{r.spot_number}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {format(new Date(r.reserved_at), "Pp", { locale: fr })}
+                      {format(new Date(r.start_time), "Pp", { locale: fr })}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {format(new Date(r.end_time), "Pp", { locale: fr })}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatDuration(r.start_time, r.end_time)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}
+                      >
                         {s.label}
                       </span>
                     </td>

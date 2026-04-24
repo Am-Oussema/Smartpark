@@ -44,29 +44,38 @@ export type Database = {
       reservations: {
         Row: {
           cancelled_at: string | null
-          expires_at: string
+          end_time: string
+          expires_at: string | null
           id: string
           reserved_at: string
           spot_number: number
+          start_time: string
           status: string
+          updated_at: string
           user_id: string
         }
         Insert: {
           cancelled_at?: string | null
-          expires_at?: string
+          end_time?: string
+          expires_at?: string | null
           id?: string
           reserved_at?: string
           spot_number: number
+          start_time?: string
           status?: string
+          updated_at?: string
           user_id: string
         }
         Update: {
           cancelled_at?: string | null
-          expires_at?: string
+          end_time?: string
+          expires_at?: string | null
           id?: string
           reserved_at?: string
           spot_number?: number
+          start_time?: string
           status?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
