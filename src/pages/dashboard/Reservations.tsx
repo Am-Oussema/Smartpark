@@ -5,7 +5,7 @@ import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   ReservationDialog,
@@ -28,6 +28,7 @@ export default function Reservations() {
   const [items, setItems] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("active");
+  const [tick, setTick] = useState(0); // ← forces re-render every second
 
   const [editing, setEditing] = useState<ReservationDraft | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,6 +62,15 @@ export default function Reservations() {
     const i = setInterval(load, 15_000);
     return () => clearInterval(i);
   }, [load]);
+    const poll = setInterval(load, 10_000);
+    return () => clearInterval(poll);
+  }, [user]);
+
+  // 1-second ticker — keeps countdown display live
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const cancel = async (id: string) => {
     const { error } = await supabase
@@ -194,6 +204,13 @@ export default function Reservations() {
                   <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
                     <Pencil className="mr-1 h-3.5 w-3.5" /> Modifier
                   </Button>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">Expire dans</div>
+                    <div className={`font-mono font-semibold tabular-nums ${remainingMs < 60_000 ? "text-destructive" : "text-reserved"}`}>
+                      {String(remainingMin).padStart(2, "0")}:{String(remainingSec).padStart(2, "0")}
+                    </div>
+                  </div>
                   <Button size="sm" variant="outline" onClick={() => cancel(r.id)}>
                     <X className="mr-1 h-3.5 w-3.5" /> Annuler
                   </Button>

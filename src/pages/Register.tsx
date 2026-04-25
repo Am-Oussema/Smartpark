@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Car, Loader2 } from "lucide-react";
+import { Car, Loader2, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ export default function Register() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -41,7 +42,6 @@ export default function Register() {
     setLoading(false);
 
     if (error) {
-      // Cas 1 — Supabase renvoie explicitement une erreur "already registered"
       if (error.message.toLowerCase().includes("registered")) {
         toast.error("Email déjà utilisé", {
           description: "Un compte existe déjà avec cet email. Connectez-vous.",
@@ -53,8 +53,6 @@ export default function Register() {
       return;
     }
 
-    // Cas 2 — Détection silencieuse (protection anti-énumération de Supabase) :
-    // si l'email existe déjà, Supabase renvoie un `user` factice MAIS avec `identities = []`.
     if (data.user && data.user.identities && data.user.identities.length === 0) {
       toast.error("Email déjà utilisé", {
         description: "Un compte existe déjà avec cet email. Connectez-vous.",
@@ -63,10 +61,8 @@ export default function Register() {
       return;
     }
 
-    // Cas 3 — Inscription réelle
     toast.success("Compte créé !", { description: "Vous êtes connecté." });
     navigate("/dashboard", { replace: true });
-
   };
 
   return (
@@ -112,15 +108,27 @@ export default function Register() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Au moins 8 caractères"
-                autoComplete="new-password"
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Au moins 8 caractères"
+                  autoComplete="new-password"
+                  className="pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" disabled={loading} className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90">
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
