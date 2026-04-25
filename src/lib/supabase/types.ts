@@ -48,6 +48,11 @@ export type Database = {
           full_name: string | null
           id: string
           phone: string | null
+          phone_verified: boolean
+          trust_score: number
+          daily_res_count: number
+          daily_reset_at: string
+          ban_until: string | null
           updated_at: string
         }
         Insert: {
@@ -56,6 +61,11 @@ export type Database = {
           full_name?: string | null
           id: string
           phone?: string | null
+          phone_verified?: boolean
+          trust_score?: number
+          daily_res_count?: number
+          daily_reset_at?: string
+          ban_until?: string | null
           updated_at?: string
         }
         Update: {
@@ -64,6 +74,11 @@ export type Database = {
           full_name?: string | null
           id?: string
           phone?: string | null
+          phone_verified?: boolean
+          trust_score?: number
+          daily_res_count?: number
+          daily_reset_at?: string
+          ban_until?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -116,6 +131,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vehicles: {
+        Row: {
+          id: string
+          user_id: string
+          plate: string
+          label: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          plate: string
+          label?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          plate?: string
+          label?: string | null
+          is_active?: boolean
+          created_at?: string
         }
         Relationships: []
       }
