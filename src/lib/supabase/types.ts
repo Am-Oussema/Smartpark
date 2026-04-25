@@ -140,7 +140,6 @@ export type Database = {
           user_id: string
           plate: string
           label: string | null
-          is_active: boolean
           created_at: string
         }
         Insert: {
@@ -148,7 +147,6 @@ export type Database = {
           user_id: string
           plate: string
           label?: string | null
-          is_active?: boolean
           created_at?: string
         }
         Update: {
@@ -156,7 +154,6 @@ export type Database = {
           user_id?: string
           plate?: string
           label?: string | null
-          is_active?: boolean
           created_at?: string
         }
         Relationships: []

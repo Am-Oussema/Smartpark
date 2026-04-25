@@ -17,7 +17,6 @@ CREATE TABLE public.vehicles (
   user_id    uuid        NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   plate      text        NOT NULL,
   label      text,
-  is_active  boolean     NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT vehicles_plate_unique UNIQUE (plate)
 );
