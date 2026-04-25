@@ -2,8 +2,6 @@ import {useEffect, useMemo, useRef, useState} from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import {supabase} from "@/lib/supabase/client.ts";
 
 export interface ReservationDraft {
   id?: string;

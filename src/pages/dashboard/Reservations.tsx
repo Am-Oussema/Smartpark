@@ -3,7 +3,6 @@ import { Loader2, X, Calendar, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -59,12 +58,9 @@ export default function Reservations() {
 
   useEffect(() => {
     load();
-    const i = setInterval(load, 15_000);
-    return () => clearInterval(i);
-  }, [load]);
     const poll = setInterval(load, 10_000);
     return () => clearInterval(poll);
-  }, [user]);
+  }, [user, load]);
 
   // 1-second ticker — keeps countdown display live
   useEffect(() => {
@@ -172,54 +168,49 @@ export default function Reservations() {
               const sec = Math.max(0, Math.floor((remainingMs % 60_000) / 1000));
               countdownLabel = `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
             }
-
-            return (
-              <div
-                key={r.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-reserved/40 bg-reserved/5 p-4"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-reserved/15 text-lg font-bold text-reserved">
-                    P{r.spot_number}
-                  </div>
-                  <div>
-                    <div className="font-semibold">Place P{r.spot_number}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Du {format(start, "PPPp", { locale: fr })}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Au {format(end, "PPPp", { locale: fr })}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isCurrent && (
-                    <div className="text-right">
-                      <div className="text-xs text-muted-foreground">Expire dans</div>
-                      <div className="font-mono font-semibold tabular-nums text-reserved">
-                        {countdownLabel}
+              // ... inside your items.map return
+              return (
+                  <div
+                      key={r.id}
+                      className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-reserved/40 bg-reserved/5 p-4"
+                  >
+                      <div className="flex items-center gap-4">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-reserved/15 text-lg font-bold text-reserved">
+                              P{r.spot_number}
+                          </div>
+                          <div>
+                              <div className="font-semibold">Place P{r.spot_number}</div>
+                              <div className="text-xs text-muted-foreground">
+                                  Du {format(start, "PPPp", { locale: fr })}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                  Au {format(end, "PPPp", { locale: fr })}
+                              </div>
+                          </div>
                       </div>
-                    </div>
-                  )}
-                  <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
-                    <Pencil className="mr-1 h-3.5 w-3.5" /> Modifier
-                  </Button>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-xs text-muted-foreground">Expire dans</div>
-                    <div className={`font-mono font-semibold tabular-nums ${remainingMs < 60_000 ? "text-destructive" : "text-reserved"}`}>
-                      {String(remainingMin).padStart(2, "0")}:{String(remainingSec).padStart(2, "0")}
-                    </div>
+
+                      <div className="flex items-center gap-2">
+                          {isCurrent && (
+                              <div className="text-right mr-3">
+                                  <div className="text-xs text-muted-foreground">Expire dans</div>
+                                  <div className={`font-mono font-semibold tabular-nums ${
+                                      (end.getTime() - now) < 60_000 ? "text-destructive" : "text-reserved"
+                                  }`}>
+                                      {countdownLabel}
+                                  </div>
+                              </div>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
+                              <Pencil className="mr-1 h-3.5 w-3.5" /> Modifier
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => cancel(r.id)}>
+                              <X className="mr-1 h-3.5 w-3.5" /> Annuler
+                          </Button>
+                      </div>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => cancel(r.id)}>
-                    <X className="mr-1 h-3.5 w-3.5" /> Annuler
-                  </Button>
-                </div>
-              </div>
-            );
+              );
           })}
-        </div>
-      )}
+    </div>)}
 
       <ReservationDialog
         open={dialogOpen}
