@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -92,6 +92,7 @@ export function ReservationDialog({
   onSaved,
 }: Props) {
   const { user } = useAuth();
+  const initialized = useRef(false);
 
   const [spotNumber, setSpotNumber] = useState<number>(
     reservation?.spotNumber ?? initialSpot ?? availableSpots[0] ?? 0,
@@ -106,14 +107,19 @@ export function ReservationDialog({
   const [submitting, setSubmitting] = useState(false);
   const [conflictError, setConflictError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    setSpotNumber(reservation?.spotNumber ?? initialSpot ?? availableSpots[0] ?? 0);
-    const s = reservation?.startTime ?? roundToNext5Min(new Date());
-    setStartTime(s);
-    setEndTime(reservation?.endTime ?? new Date(s.getTime() + 30 * 60 * 1000));
-    setConflictError(null);
-  }, [open, reservation, initialSpot, availableSpots]);
+    useEffect(() => {
+        if (open && !initialized.current) {
+            setSpotNumber(reservation?.spotNumber ?? initialSpot ?? availableSpots[0] ?? 0);
+            const s = reservation?.startTime ?? roundToNext5Min(new Date());
+            setStartTime(s);
+            setEndTime(reservation?.endTime ?? new Date(s.getTime() + 30 * 60 * 1000));
+            initialized.current = true;
+        } else if (!open) {
+            // 2. Reset the flag when the dialog closes so it re-initializes next time
+            initialized.current = false;
+            setConflictError(null);
+        }
+    }, [open]);
 
   const durationMinutes = useMemo(
     () => Math.round((endTime.getTime() - startTime.getTime()) / 60_000),
