@@ -9,15 +9,46 @@
 
 import { supabase } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { INITIAL_SPOTS, type ParkingSpot, type SpotStatus, BUSINESS_CONFIG } from "@/data/mockParking";
+import { INITIAL_SPOTS, type ParkingSpot, type SpotStatus } from "@/data/mockParking";
 import { toast } from "sonner";
+
+interface Config {
+  basePrice: number;
+  surgeThreshold: number;
+  surgeMultiplier: number;
+  alertThreshold: number;
+}
 
 export function useParkingData() {
   const [spots, setSpots] = useState<ParkingSpot[]>(INITIAL_SPOTS);
   const [entries, setEntries] = useState(0);
   const [exits, setExits] = useState(0);
+  const [config, setConfig] = useState<Config>({
+    basePrice: 2,
+    surgeThreshold: 70,
+    surgeMultiplier: 1.2,
+    alertThreshold: 80,
+  });
   const alertedFullRef = useRef(false);
   const alertedThresholdRef = useRef(false);
+
+  // Fetch live settings from DB on mount
+  useEffect(() => {
+    supabase
+      .from("settings")
+      .select("base_price, surge_threshold, surge_multiplier, alert_threshold")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        if (data)
+          setConfig({
+            basePrice: data.base_price,
+            surgeThreshold: data.surge_threshold,
+            surgeMultiplier: data.surge_multiplier,
+            alertThreshold: data.alert_threshold,
+          });
+      });
+  }, []);
 
   // On mount: restore active reservations from DB into the map
   useEffect(() => {
@@ -51,19 +82,19 @@ export function useParkingData() {
   const free = spots.filter((s) => s.status === "free").length;
   const occupancyRate = Math.round(((occupied + reserved) / total) * 100);
 
-  // Dynamic pricing
+  // Dynamic pricing — reads from live DB config
   const currentPrice = useMemo(() => {
-    const surge = occupancyRate >= BUSINESS_CONFIG.surgeThreshold;
+    const surge = occupancyRate >= config.surgeThreshold;
     return {
-      base: BUSINESS_CONFIG.basePrice,
+      base: config.basePrice,
       current: surge
-        ? +(BUSINESS_CONFIG.basePrice * BUSINESS_CONFIG.surgeMultiplier).toFixed(2)
-        : BUSINESS_CONFIG.basePrice,
+        ? +(config.basePrice * config.surgeMultiplier).toFixed(2)
+        : config.basePrice,
       surge,
     };
-  }, [occupancyRate]);
+  }, [occupancyRate, config]);
 
-  // Alerts
+  // Alerts — uses live config thresholds
   useEffect(() => {
     if (occupancyRate >= 100 && !alertedFullRef.current) {
       toast.error("🚨 Parking complet !", { description: "Aucune place disponible." });
@@ -73,7 +104,7 @@ export function useParkingData() {
     }
 
     if (
-      occupancyRate >= BUSINESS_CONFIG.alertThreshold &&
+      occupancyRate >= config.alertThreshold &&
       occupancyRate < 100 &&
       !alertedThresholdRef.current
     ) {
@@ -81,12 +112,12 @@ export function useParkingData() {
         description: "Le seuil critique est dépassé.",
       });
       alertedThresholdRef.current = true;
-    } else if (occupancyRate < BUSINESS_CONFIG.alertThreshold) {
+    } else if (occupancyRate < config.alertThreshold) {
       alertedThresholdRef.current = false;
     }
-  }, [occupancyRate]);
+  }, [occupancyRate, config.alertThreshold]);
 
-  // Reservation timers — auto-release after 5 min
+  // Reservation timers — auto-release
   useEffect(() => {
     const interval = setInterval(() => {
       setSpots((prev) =>

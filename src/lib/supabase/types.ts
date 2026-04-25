@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      settings: {
+        Row: {
+          id: number
+          base_price: number
+          surge_threshold: number
+          surge_multiplier: number
+          alert_threshold: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          base_price?: number
+          surge_threshold?: number
+          surge_multiplier?: number
+          alert_threshold?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          base_price?: number
+          surge_threshold?: number
+          surge_multiplier?: number
+          alert_threshold?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
