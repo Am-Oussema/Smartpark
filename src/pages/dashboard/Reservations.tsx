@@ -19,6 +19,7 @@ export default function Reservations() {
   const { user } = useAuth();
   const [items, setItems] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0); // ← forces re-render every second
 
   const load = async () => {
     if (!user) return;
@@ -37,9 +38,15 @@ export default function Reservations() {
 
   useEffect(() => {
     load();
-    const i = setInterval(load, 10_000);
-    return () => clearInterval(i);
+    const poll = setInterval(load, 10_000);
+    return () => clearInterval(poll);
   }, [user]);
+
+  // 1-second ticker — keeps countdown display live
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const cancel = async (id: string) => {
     const { error } = await supabase
@@ -98,7 +105,7 @@ export default function Reservations() {
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <div className="text-xs text-muted-foreground">Expire dans</div>
-                    <div className="font-mono font-semibold tabular-nums text-reserved">
+                    <div className={`font-mono font-semibold tabular-nums ${remainingMs < 60_000 ? "text-destructive" : "text-reserved"}`}>
                       {String(remainingMin).padStart(2, "0")}:{String(remainingSec).padStart(2, "0")}
                     </div>
                   </div>
