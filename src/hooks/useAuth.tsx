@@ -28,10 +28,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(sess?.user ?? null);
     });
 
-    // 2. Then check existing session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
+    // 2. getUser() hits the server — detects deleted/invalid accounts
+    //    unlike getSession() which only reads localStorage
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error || !data.user) {
+        // Token exists locally but is invalid server-side (deleted account, expired, etc.)
+        supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -42,7 +47,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
-  return <Ctx.Provider value={{ user, session, loading, signOut }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={{ user, session, loading, signOut }}>
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export const useAuth = () => useContext(Ctx);
