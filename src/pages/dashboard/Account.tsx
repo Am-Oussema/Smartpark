@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useProfile } from "@/hooks/useProfile";
 
 const phoneSchema = z
   .string()
@@ -33,6 +34,11 @@ export default function Account() {
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const { profile, refetchProfile } = useProfile();
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // --- Password ---
   const [currentPassword, setCurrentPassword] = useState("");
@@ -80,11 +86,21 @@ export default function Account() {
       return;
     }
     setSaving(true);
+
+    // If phone changed, reset verification status
+    const phoneChanged = phone.trim() !== (profile?.phone ?? "").trim();
+
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName.trim(), phone: phone.trim() })
+      .update({
+        full_name: fullName.trim(),
+        phone: phone.trim(),
+        ...(phoneChanged && { phone_verified: false }),
+      })
       .eq("id", user.id);
+
     setSaving(false);
+
     if (error) {
       if (error.message.includes("profiles_phone_unique")) {
         toast.error("Numéro déjà utilisé", {
@@ -95,9 +111,118 @@ export default function Account() {
       toast.error("Échec de la mise à jour", { description: error.message });
       return;
     }
-    toast.success("Profil mis à jour");
+
+    if (phoneChanged) {
+      // Clean up old unused verification codes
+      await supabase
+        .from("verification_codes")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("used", false);
+
+      await refetchProfile();
+      setOtpSent(false);
+      setOtpCode("");
+      toast.warning("Numéro mis à jour — vérifiez votre nouveau numéro", {
+        description: "Votre accès aux réservations est suspendu jusqu'à vérification.",
+        duration: 6000,
+      });
+    } else {
+      toast.success("Profil mis à jour");
+    }
+  };
+  const onSendOtp = async () => {
+    if (!user) return;
+    const phoneCheck = phoneSchema.safeParse(phone);
+    if (!phoneCheck.success) {
+      toast.error(phoneCheck.error.errors[0].message);
+      return;
+    }
+    setSendingOtp(true);
+
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Delete any previous unused codes for this user
+    await supabase
+      .from("verification_codes")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("used", false);
+
+    // Store new code
+    const { error } = await supabase
+      .from("verification_codes")
+      .insert({
+        user_id: user.id,
+        phone,
+        code,
+      });
+
+    setSendingOtp(false);
+
+    if (error) {
+      toast.error("Échec", { description: error.message });
+      return;
+    }
+
+    setOtpSent(true);
+
+    // DEV MODE — show code in toast until SMS provider is configured
+    toast.success("Code généré", {
+      description: `Votre code : xxxxxx`,
+      duration: 10000,
+    });
   };
 
+  const onVerifyOtp = async () => {
+    if (!user) return;
+    setVerifyingOtp(true);
+
+    // Find valid unused code for this user
+    const { data, error } = await supabase
+      .from("verification_codes")
+      .select("id, code, expires_at, used")
+      .eq("user_id", user.id)
+      .eq("phone", phone)
+      .eq("used", false)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      setVerifyingOtp(false);
+      toast.error("Code introuvable ou expiré — renvoyez un nouveau code");
+      return;
+    }
+
+    if (data.code !== otpCode) {
+      setVerifyingOtp(false);
+      toast.error("Code incorrect");
+      return;
+    }
+
+    // Mark code as used
+    await supabase
+      .from("verification_codes")
+      .update({ used: true })
+      .eq("id", data.id);
+
+    // Mark phone as verified
+    await supabase
+      .from("profiles")
+      .update({ phone_verified: true })
+      .eq("id", user.id);
+
+    setVerifyingOtp(false);
+    setOtpSent(false);
+    setOtpCode("");
+    await refetchProfile();
+    toast.success("Téléphone vérifié ✓", {
+      description: "Vous pouvez maintenant réserver des places.",
+    });
+  };
   // Change password — re-authenticate first
   const onChangePassword = async () => {
     if (!user?.email) return;
@@ -226,18 +351,86 @@ export default function Account() {
               maxLength={100}
             />
           </div>
+          {/* Phone field with verification */}
           <div className="space-y-2">
             <Label htmlFor="phone">Téléphone</Label>
-            <Input
-              id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+21620123456"
-              maxLength={30}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+21620123456"
+                maxLength={30}
+                className="flex-1"
+              />
+              {profile?.phone_verified ? (
+                <span className="flex-shrink-0 rounded-full bg-success/15 px-2.5 py-1 text-xs font-medium text-success">
+                  ✓ Vérifié
+                </span>
+              ) : (
+                <span className="flex-shrink-0 rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive">
+                  Non vérifié
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               Format : +216 suivi de 8 chiffres
             </p>
+
+            {/* OTP verification block — shown when phone not verified */}
+            {!profile?.phone_verified && (
+              <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-4 space-y-3">
+                {!otpSent ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={onSendOtp}
+                    disabled={sendingOtp || !phone}
+                  >
+                    {sendingOtp && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                    Envoyer le code de vérification
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">Code reçu par SMS</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="otp"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="123456"
+                        maxLength={6}
+                        className="font-mono tracking-widest w-36"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={onVerifyOtp}
+                        disabled={verifyingOtp || otpCode.length !== 6}
+                        className="bg-gradient-primary text-primary-foreground hover:opacity-90"
+                      >
+                        {verifyingOtp && (
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        )}
+                        Vérifier
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setOtpSent(false); setOtpCode(""); }}
+                      >
+                        Renvoyer
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Code envoyé au {phone}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <Button
             onClick={onSaveProfile}
