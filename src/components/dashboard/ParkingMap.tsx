@@ -6,6 +6,7 @@ interface Props {
   spots: ParkingSpot[];
   onReserve: (id: number) => void;
   onCancelReservation: (id: number) => void;
+  canReserve?: boolean;
 }
 
 function getRemainingSeconds(reservedUntil?: number) {
@@ -13,7 +14,12 @@ function getRemainingSeconds(reservedUntil?: number) {
   return Math.max(0, Math.floor((reservedUntil - Date.now()) / 1000));
 }
 
-export function ParkingMap({ spots, onReserve, onCancelReservation }: Props) {
+export function ParkingMap({
+  spots,
+  onReserve,
+  onCancelReservation,
+  canReserve = true,
+}: Props) {
   return (
     <div className="rounded-xl border border-border bg-gradient-card p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
@@ -56,12 +62,17 @@ export function ParkingMap({ spots, onReserve, onCancelReservation }: Props) {
 
               <div className="mt-2 w-full text-center">
                 <div className="text-xs font-medium uppercase tracking-wide">
-                  {spot.status === "free" ? "Libre" : spot.status === "occupied" ? "Occupée" : "Réservée"}
+                  {spot.status === "free"
+                    ? "Libre"
+                    : spot.status === "occupied"
+                    ? "Occupée"
+                    : "Réservée"}
                 </div>
 
                 {spot.status === "reserved" && (
                   <div className="mt-1 font-mono text-sm tabular-nums">
-                    {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+                    {String(mins).padStart(2, "0")}:
+                    {String(secs).padStart(2, "0")}
                   </div>
                 )}
 
@@ -69,7 +80,11 @@ export function ParkingMap({ spots, onReserve, onCancelReservation }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="mt-2 h-7 w-full text-xs"
+                    className={`mt-2 h-7 w-full text-xs ${
+                      !canReserve
+                        ? "opacity-40 cursor-not-allowed"
+                        : ""
+                    }`}
                     onClick={() => onReserve(spot.id)}
                   >
                     Réserver
@@ -95,7 +110,13 @@ export function ParkingMap({ spots, onReserve, onCancelReservation }: Props) {
   );
 }
 
-function Legend({ color, label }: { color: "success" | "destructive" | "reserved"; label: string }) {
+function Legend({
+  color,
+  label,
+}: {
+  color: "success" | "destructive" | "reserved";
+  label: string;
+}) {
   const cls =
     color === "success"
       ? "bg-success"

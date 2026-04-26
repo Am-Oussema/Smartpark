@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useParkingData } from "@/hooks/useParkingData";
+import { useProfile } from "@/hooks/useProfile";
 import { KpiCards } from "@/components/dashboard/KpiCards";
 import { ParkingMap } from "@/components/dashboard/ParkingMap";
 import { EntryExitCounter } from "@/components/dashboard/EntryExitCounter";
@@ -13,9 +14,17 @@ import { toast } from "sonner";
 export default function DashboardOverview() {
   const data = useParkingData();
   const { user } = useAuth();
+  const { profile } = useProfile();
 
-  // Save reservation to DB so user sees it in History/Reservations
+  const canReserve = profile?.phone_verified === true;
+
   const handleReserve = async (id: number) => {
+    if (!canReserve) {
+      toast.warning("Téléphone non vérifié", {
+        description: "Vérifiez votre numéro dans Mon compte pour réserver.",
+      });
+      return;
+    }
     data.reserveSpot(id);
     if (!user) return;
     const { error } = await supabase.from("reservations").insert({
@@ -25,7 +34,9 @@ export default function DashboardOverview() {
       expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     });
     if (error) {
-      toast.error("Réservation locale ok, mais sauvegarde échouée", { description: error.message });
+      toast.error("Réservation locale ok, mais sauvegarde échouée", {
+        description: error.message,
+      });
     } else {
       toast.success(`Place P${id} réservée pour 5 min`);
     }
@@ -43,7 +54,6 @@ export default function DashboardOverview() {
     toast.info(`Réservation P${id} annulée`);
   };
 
-  // Auto-mark expired reservations in DB on each render
   useEffect(() => {
     if (!user) return;
     supabase
