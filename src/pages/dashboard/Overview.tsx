@@ -89,6 +89,7 @@ export default function DashboardOverview() {
             spots={data.spots}
             onReserve={handleReserve}
             onCancelReservation={handleCancel}
+            canReserve={canReserve}
           />
         </div>
         <EntryExitCounter
