@@ -158,6 +158,36 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_codes: {
+        Row: {
+          id: string
+          user_id: string
+          phone: string
+          code: string
+          expires_at: string
+          used: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          phone: string
+          code: string
+          expires_at?: string
+          used?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          phone?: string
+          code?: string
+          expires_at?: string
+          used?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
