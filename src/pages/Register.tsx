@@ -36,6 +36,26 @@ export default function Register() {
     }
     setLoading(true);
 
+    // Check phone availability before creating account
+    const { data: phoneCheck, error: phoneCheckError } = await supabase
+      .rpc("phone_exists", { p_phone: phone });
+
+    if (phoneCheckError) {
+      setLoading(false);
+      toast.error("Erreur de vérification", {
+        description: phoneCheckError.message,
+      });
+      return;
+    }
+
+    if (phoneCheck === true) {
+      setLoading(false);
+      toast.error("Numéro déjà utilisé", {
+        description: "Ce numéro est lié à un autre compte vérifié.",
+      });
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -154,7 +174,11 @@ export default function Register() {
                   tabIndex={-1}
                   aria-label={showPassword ? "Masquer" : "Afficher"}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </div>
