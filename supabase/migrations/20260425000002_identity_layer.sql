@@ -6,10 +6,12 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS daily_reset_at  date         NOT NULL DEFAULT CURRENT_DATE,
   ADD COLUMN IF NOT EXISTS ban_until       timestamptz;
 
--- Phone uniqueness enforced at DB level (ignores nulls and empty strings)
-CREATE UNIQUE INDEX IF NOT EXISTS profiles_phone_unique
+
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_phone_verified_unique
   ON public.profiles (phone)
-  WHERE phone IS NOT NULL AND phone != '';
+  WHERE phone IS NOT NULL
+  AND phone != ''
+  AND phone_verified = true;
 
 -- Vehicles table
 CREATE TABLE public.vehicles (
