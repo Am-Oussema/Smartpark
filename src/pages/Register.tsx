@@ -41,7 +41,7 @@ export default function Register() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/dashboard`,
-        data: { full_name: fullName },
+        data: { full_name: fullName, phone },
       },
     });
 
@@ -66,28 +66,6 @@ export default function Register() {
       });
       navigate("/login", { replace: true });
       return;
-    }
-
-    // Save phone to profile
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ phone })
-        .eq("id", data.user.id);
-
-      if (profileError) {
-        // Phone already taken by another account
-        if (profileError.message.includes("profiles_phone_unique")) {
-          setLoading(false);
-          // Roll back: delete the just-created auth user isn't possible client-side,
-          // so sign them out and inform them
-          await supabase.auth.signOut();
-          toast.error("Numéro déjà utilisé", {
-            description: "Ce numéro est lié à un autre compte.",
-          });
-          return;
-        }
-      }
     }
 
     setLoading(false);
