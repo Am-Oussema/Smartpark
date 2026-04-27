@@ -69,9 +69,9 @@ export default function Account() {
         .select("id, plate, label")
         .eq("user_id", user.id)
         .order("created_at"),
-    ]).then(([profile, vehiclesRes]) => {
-      setFullName(profile.data?.full_name ?? "");
-      setPhone(profile.data?.phone ?? "");
+    ]).then(([profileRes, vehiclesRes]) => {
+      setFullName(profileRes.data?.full_name ?? "");
+      setPhone(profileRes.data?.phone ?? "");
       setVehicles(vehiclesRes.data ?? []);
       setLoading(false);
     });
@@ -80,15 +80,38 @@ export default function Account() {
   // Save profile
   const onSaveProfile = async () => {
     if (!user) return;
+
     const phoneCheck = phoneSchema.safeParse(phone);
     if (!phoneCheck.success) {
       toast.error(phoneCheck.error.errors[0].message);
       return;
     }
+
+    const phoneChanged = phone.trim() !== (profile?.phone ?? "").trim();
+
     setSaving(true);
 
-    // If phone changed, reset verification status
-    const phoneChanged = phone.trim() !== (profile?.phone ?? "").trim();
+    // If phone changed, check it's not already verified on another account
+    if (phoneChanged) {
+      const { data: phoneExists, error: phoneCheckError } = await supabase
+        .rpc("phone_exists", { p_phone: phone.trim() });
+
+      if (phoneCheckError) {
+        setSaving(false);
+        toast.error("Erreur de vérification", {
+          description: phoneCheckError.message,
+        });
+        return;
+      }
+
+      if (phoneExists === true) {
+        setSaving(false);
+        toast.error("Numéro déjà utilisé", {
+          description: "Ce numéro est vérifié sur un autre compte.",
+        });
+        return;
+      }
+    }
 
     const { error } = await supabase
       .from("profiles")
@@ -102,18 +125,11 @@ export default function Account() {
     setSaving(false);
 
     if (error) {
-      if (error.message.includes("profiles_phone_unique")) {
-        toast.error("Numéro déjà utilisé", {
-          description: "Ce numéro est lié à un autre compte.",
-        });
-        return;
-      }
       toast.error("Échec de la mise à jour", { description: error.message });
       return;
     }
 
     if (phoneChanged) {
-      // Clean up old unused verification codes
       await supabase
         .from("verification_codes")
         .delete()
@@ -131,6 +147,8 @@ export default function Account() {
       toast.success("Profil mis à jour");
     }
   };
+
+  // Send OTP
   const onSendOtp = async () => {
     if (!user) return;
     const phoneCheck = phoneSchema.safeParse(phone);
@@ -140,24 +158,17 @@ export default function Account() {
     }
     setSendingOtp(true);
 
-    // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Delete any previous unused codes for this user
     await supabase
       .from("verification_codes")
       .delete()
       .eq("user_id", user.id)
       .eq("used", false);
 
-    // Store new code
     const { error } = await supabase
       .from("verification_codes")
-      .insert({
-        user_id: user.id,
-        phone,
-        code,
-      });
+      .insert({ user_id: user.id, phone, code });
 
     setSendingOtp(false);
 
@@ -168,18 +179,18 @@ export default function Account() {
 
     setOtpSent(true);
 
-    // DEV MODE — show code in toast until SMS provider is configured
+    // DEV — show code until SMS provider configured
     toast.success("Code généré", {
-      description: `Votre code : xxxxxx`,
-      duration: 10000,
+      description: `[DEV] Votre code : ${code}`,
+      duration: 5000,
     });
   };
 
+  // Verify OTP
   const onVerifyOtp = async () => {
     if (!user) return;
     setVerifyingOtp(true);
 
-    // Find valid unused code for this user
     const { data, error } = await supabase
       .from("verification_codes")
       .select("id, code, expires_at, used")
@@ -209,11 +220,19 @@ export default function Account() {
       .update({ used: true })
       .eq("id", data.id);
 
-    // Mark phone as verified
-    await supabase
+    // Mark phone as verified — check the result
+    const { error: verifyError } = await supabase
       .from("profiles")
       .update({ phone_verified: true })
       .eq("id", user.id);
+
+    if (verifyError) {
+      setVerifyingOtp(false);
+      toast.error("Ce numéro vient d'être vérifié sur un autre compte.", {
+        description: "Utilisez un numéro différent.",
+      });
+      return;
+    }
 
     setVerifyingOtp(false);
     setOtpSent(false);
@@ -223,7 +242,8 @@ export default function Account() {
       description: "Vous pouvez maintenant réserver des places.",
     });
   };
-  // Change password — re-authenticate first
+
+  // Change password
   const onChangePassword = async () => {
     if (!user?.email) return;
     if (!currentPassword) {
@@ -286,7 +306,7 @@ export default function Account() {
     if (error) {
       if (error.message.includes("vehicles_plate_unique")) {
         toast.error("Plaque déjà enregistrée", {
-          description: "Ce véhicule est actif.",
+          description: "Ce véhicule est actif sur un autre compte.",
         });
         return;
       }
@@ -300,12 +320,9 @@ export default function Account() {
     toast.success("Véhicule ajouté");
   };
 
-  // Remove vehicle — hard delete
+  // Remove vehicle
   const onRemoveVehicle = async (id: string) => {
-    const { error } = await supabase
-      .from("vehicles")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("vehicles").delete().eq("id", id);
     if (error) {
       toast.error("Échec", { description: error.message });
       return;
@@ -351,6 +368,7 @@ export default function Account() {
               maxLength={100}
             />
           </div>
+
           {/* Phone field with verification */}
           <div className="space-y-2">
             <Label htmlFor="phone">Téléphone</Label>
@@ -377,9 +395,8 @@ export default function Account() {
               Format : +216 suivi de 8 chiffres
             </p>
 
-            {/* OTP verification block — shown when phone not verified */}
             {!profile?.phone_verified && (
-              <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-4 space-y-3">
+              <div className="space-y-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-4">
                 {!otpSent ? (
                   <Button
                     type="button"
@@ -388,7 +405,9 @@ export default function Account() {
                     onClick={onSendOtp}
                     disabled={sendingOtp || !phone}
                   >
-                    {sendingOtp && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                    {sendingOtp && (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    )}
                     Envoyer le code de vérification
                   </Button>
                 ) : (
@@ -398,10 +417,14 @@ export default function Account() {
                       <Input
                         id="otp"
                         value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                        onChange={(e) =>
+                          setOtpCode(
+                            e.target.value.replace(/\D/g, "").slice(0, 6)
+                          )
+                        }
                         placeholder="123456"
                         maxLength={6}
-                        className="font-mono tracking-widest w-36"
+                        className="w-36 font-mono tracking-widest"
                       />
                       <Button
                         type="button"
@@ -419,7 +442,10 @@ export default function Account() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        onClick={() => { setOtpSent(false); setOtpCode(""); }}
+                        onClick={() => {
+                          setOtpSent(false);
+                          setOtpCode("");
+                        }}
                       >
                         Renvoyer
                       </Button>
@@ -432,6 +458,7 @@ export default function Account() {
               </div>
             )}
           </div>
+
           <Button
             onClick={onSaveProfile}
             disabled={saving}
@@ -494,7 +521,7 @@ export default function Account() {
                 <button
                   type="button"
                   onClick={toggle}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                   tabIndex={-1}
                 >
                   {show ? (
@@ -546,7 +573,7 @@ export default function Account() {
         </div>
 
         {showVehicleForm && (
-          <div className="mb-4 rounded-lg border border-dashed border-border p-4 space-y-3">
+          <div className="mb-4 space-y-3 rounded-lg border border-dashed border-border p-4">
             <div className="space-y-2">
               <Label htmlFor="plate">Numéro de plaque</Label>
               <Input
@@ -603,7 +630,7 @@ export default function Account() {
             <p className="text-sm text-muted-foreground">
               Aucun véhicule enregistré.
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="mt-1 text-xs text-muted-foreground">
               Ajoutez un véhicule pour pouvoir réserver une place.
             </p>
           </div>
@@ -619,7 +646,7 @@ export default function Account() {
                     <Car className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <div className="font-mono font-semibold text-sm">
+                    <div className="font-mono text-sm font-semibold">
                       {v.plate}
                     </div>
                     {v.label && (
@@ -631,7 +658,7 @@ export default function Account() {
                 </div>
                 <button
                   onClick={() => onRemoveVehicle(v.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  className="text-muted-foreground transition-colors hover:text-destructive"
                   aria-label="Supprimer"
                 >
                   <Trash2 className="h-4 w-4" />
