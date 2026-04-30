@@ -20,7 +20,7 @@ const features = [
   { icon: Car, title: "Carte parking en direct", desc: "Grille visuelle libre / occupé / réservé pour chaque place." },
   { icon: Activity, title: "KPIs temps réel", desc: "Places libres, occupées et taux d'occupation calculés en direct." },
   { icon: BarChart3, title: "Analytics business", desc: "Trafic par heure et historique d'occupation pour mieux décider." },
-  { icon: Calendar, title: "Réservation 5 min", desc: "Bloquez une place le temps d'arriver, libération automatique." },
+  { icon: Calendar, title: "Réservation", desc: "Bloquez une place le temps d'arriver, libération automatique." },
   { icon: Bell, title: "Alertes intelligentes", desc: "Notifications dès que l'occupation dépasse 80% ou que le parking est plein." },
   { icon: Settings, title: "Tarification dynamique", desc: "Le tarif s'adapte à l'occupation pour maximiser la rentabilité." },
 ];
@@ -120,7 +120,7 @@ export default function Landing() {
             <div className="absolute inset-0 bg-gradient-primary opacity-20 blur-3xl" />
             <div className="relative w-full max-w-md rounded-2xl border border-border bg-card/80 p-6 shadow-elegant backdrop-blur">
               <div className="mb-4 flex items-center justify-between">
-                <div className="text-sm font-semibold">Parking — Niveau 1</div>
+                <div className="text-sm font-semibold">Parking</div>
                 <div className="flex items-center gap-1 text-xs text-success">
                   <span className="h-2 w-2 rounded-full bg-success animate-pulse-soft" /> En direct
                 </div>
