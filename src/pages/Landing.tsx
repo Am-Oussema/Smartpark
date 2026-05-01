@@ -72,8 +72,18 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-hero">
-        <div className="container relative grid gap-12 py-20 lg:grid-cols-2 lg:py-32">
+      <section className="relative overflow-hidden bg-background">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 z-0 h-full w-full object-cover dark:opacity-50"
+        >
+          <source src="/smart-park.mp4" type="video/mp4" />
+        </video>
+        {/* Overlay: Solid background fading to transparent in light mode, uniform dimming in dark mode */}
+        <div className="container relative z-10 grid gap-12 py-20 lg:grid-cols-2 lg:py-32">
           <div className="flex flex-col justify-center animate-fade-up">
             <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
               <span className="relative flex h-2 w-2">
@@ -134,13 +144,12 @@ export default function Landing() {
                 ].map((s, i) => (
                   <div
                     key={s.label}
-                    className={`relative flex h-24 items-center justify-center rounded-lg border-2 text-2xl font-bold transition-all ${
-                      s.status === "free"
-                        ? "border-success/40 bg-success/10 text-success"
-                        : s.status === "occupied"
+                    className={`relative flex h-24 items-center justify-center rounded-lg border-2 text-2xl font-bold transition-all ${s.status === "free"
+                      ? "border-success/40 bg-success/10 text-success"
+                      : s.status === "occupied"
                         ? "border-destructive/40 bg-destructive/10 text-destructive"
                         : "border-reserved/40 bg-reserved/10 text-reserved"
-                    }`}
+                      }`}
                     style={{ animation: `fade-up 0.6s ease-out ${i * 0.1}s both` }}
                   >
                     {s.status === "occupied" ? <Car className="h-8 w-8 animate-drive-in" /> : s.label}
