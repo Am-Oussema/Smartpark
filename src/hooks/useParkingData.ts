@@ -1,16 +1,19 @@
 /**
- * Centralized parking state — single source of truth for the dashboard.
- *
- * 🔌 To hook real ESP8266 data later:
- *   - Replace the in-memory `spots` state with a SWR/React-Query fetch from your API
- *   - Or open a WebSocket and call `setSpotStatus` on incoming messages
- * The components using this hook do not need to change.
+ * Centralized parking state — live from parking_spots table via Supabase Realtime.
+ * Simulate buttons are admin-only dev tools — hidden before launch.
  */
 
 import { supabase } from "@/lib/supabase/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { INITIAL_SPOTS, type ParkingSpot, type SpotStatus } from "@/data/mockParking";
 import { toast } from "sonner";
+
+export type SpotStatus = "free" | "reserved" | "occupied";
+
+export interface ParkingSpot {
+  id: number;
+  status: SpotStatus;
+  reservedUntil?: number;
+}
 
 interface Config {
   basePrice: number;
@@ -19,8 +22,19 @@ interface Config {
   alertThreshold: number;
 }
 
+function mapStatus(dbStatus: string): SpotStatus {
+  if (dbStatus === "pending") return "reserved";
+  if (dbStatus === "occupied" || dbStatus === "flagged") return "occupied";
+  return "free";
+}
+
 export function useParkingData() {
-  const [spots, setSpots] = useState<ParkingSpot[]>(INITIAL_SPOTS);
+  const [spots, setSpots] = useState<ParkingSpot[]>([
+    { id: 1, status: "free" },
+    { id: 2, status: "free" },
+    { id: 3, status: "free" },
+    { id: 4, status: "free" },
+  ]);
   const [entries, setEntries] = useState(0);
   const [exits, setExits] = useState(0);
   const [config, setConfig] = useState<Config>({
@@ -32,7 +46,7 @@ export function useParkingData() {
   const alertedFullRef = useRef(false);
   const alertedThresholdRef = useRef(false);
 
-  // Fetch live settings from DB on mount
+  // Fetch settings
   useEffect(() => {
     supabase
       .from("settings")
@@ -50,29 +64,79 @@ export function useParkingData() {
       });
   }, []);
 
-  // On mount: restore active reservations from DB into the map
+  // Fetch initial spots — expires_at directly on parking_spots
   useEffect(() => {
-    const restoreReservations = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("reservations")
-        .select("spot_number, expires_at")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .gt("expires_at", new Date().toISOString());
-      if (!data || data.length === 0) return;
-      setSpots((prev) =>
-        prev.map((s) => {
-          const match = data.find((r) => r.spot_number === s.id);
-          if (match) {
-            return { ...s, status: "reserved", reservedUntil: new Date(match.expires_at).getTime() };
-          }
-          return s;
-        })
+    const init = async () => {
+      const { data: spotsData } = await supabase
+        .from("parking_spots")
+        .select("id, status, expires_at")
+        .order("id");
+
+      if (!spotsData) return;
+
+      setSpots(
+        spotsData.map((s) => ({
+          id: s.id,
+          status: mapStatus(s.status),
+          reservedUntil: s.expires_at
+            ? new Date(s.expires_at).getTime()
+            : undefined,
+        }))
       );
     };
-    restoreReservations();
+    init();
+  }, []);
+
+  // Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("parking_spots_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "parking_spots" },
+        (payload) => {
+          const updated = payload.new as {
+            id: number;
+            status: string;
+            expires_at: string | null;
+          };
+
+          setSpots((prev) =>
+            prev.map((s) =>
+              s.id === updated.id
+                ? {
+                  ...s,
+                  status: mapStatus(updated.status),
+                  reservedUntil: updated.expires_at
+                    ? new Date(updated.expires_at).getTime()
+                    : undefined,
+                }
+                : s
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Countdown — auto-clear expired reserved spots locally
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSpots((prev) =>
+        prev.map((s) =>
+          s.status === "reserved" &&
+            s.reservedUntil &&
+            s.reservedUntil < Date.now()
+            ? { ...s, status: "free", reservedUntil: undefined }
+            : s
+        )
+      );
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   // KPIs
@@ -82,7 +146,7 @@ export function useParkingData() {
   const free = spots.filter((s) => s.status === "free").length;
   const occupancyRate = Math.round(((occupied + reserved) / total) * 100);
 
-  // Dynamic pricing — reads from live DB config
+  // Dynamic pricing
   const currentPrice = useMemo(() => {
     const surge = occupancyRate >= config.surgeThreshold;
     return {
@@ -94,10 +158,12 @@ export function useParkingData() {
     };
   }, [occupancyRate, config]);
 
-  // Alerts — uses live config thresholds
+  // Alerts
   useEffect(() => {
     if (occupancyRate >= 100 && !alertedFullRef.current) {
-      toast.error("🚨 Parking complet !", { description: "Aucune place disponible." });
+      toast.error("🚨 Parking complet !", {
+        description: "Aucune place disponible.",
+      });
       alertedFullRef.current = true;
     } else if (occupancyRate < 100) {
       alertedFullRef.current = false;
@@ -117,63 +183,41 @@ export function useParkingData() {
     }
   }, [occupancyRate, config.alertThreshold]);
 
-  // Reservation timers — auto-release
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSpots((prev) =>
-        prev.map((s) =>
-          s.status === "reserved" && s.reservedUntil && s.reservedUntil < Date.now()
-            ? { ...s, status: "free", reservedUntil: undefined }
-            : s
-        )
-      );
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const setSpotStatus = useCallback((id: number, status: SpotStatus) => {
-    setSpots((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status, reservedUntil: undefined } : s))
-    );
-  }, []);
-
-  const reserveSpot = useCallback((id: number, durationMs = 5 * 60 * 1000) => {
-    setSpots((prev) =>
-      prev.map((s) =>
-        s.id === id && s.status === "free"
-          ? { ...s, status: "reserved", reservedUntil: Date.now() + durationMs }
-          : s
-      )
-    );
-  }, []);
-
-  const cancelReservation = useCallback((id: number) => {
-    setSpots((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "free", reservedUntil: undefined } : s))
-    );
-  }, []);
-
-  const simulateEntry = useCallback(() => {
+  // Simulate entry — admin dev tool
+  const simulateEntry = useCallback(async () => {
+    const freeSpot = spots.find((s) => s.status === "free");
+    if (!freeSpot) {
+      toast.error("Aucune place libre");
+      return;
+    }
+    const { error } = await supabase
+      .from("parking_spots")
+      .update({ status: "occupied", last_updated: new Date().toISOString() })
+      .eq("id", freeSpot.id);
+    if (error) {
+      toast.error("Erreur simulate entry", { description: error.message });
+      return;
+    }
     setEntries((e) => e + 1);
-    setSpots((prev) => {
-      const idx = prev.findIndex((s) => s.status === "free");
-      if (idx === -1) return prev;
-      const copy = [...prev];
-      copy[idx] = { ...copy[idx], status: "occupied", reservedUntil: undefined };
-      return copy;
-    });
-  }, []);
+  }, [spots]);
 
-  const simulateExit = useCallback(() => {
+  // Simulate exit — admin dev tool
+  const simulateExit = useCallback(async () => {
+    const occupiedSpot = spots.find((s) => s.status === "occupied");
+    if (!occupiedSpot) {
+      toast.error("Aucune place occupée");
+      return;
+    }
+    const { error } = await supabase
+      .from("parking_spots")
+      .update({ status: "free", last_updated: new Date().toISOString() })
+      .eq("id", occupiedSpot.id);
+    if (error) {
+      toast.error("Erreur simulate exit", { description: error.message });
+      return;
+    }
     setExits((e) => e + 1);
-    setSpots((prev) => {
-      const idx = prev.findIndex((s) => s.status === "occupied");
-      if (idx === -1) return prev;
-      const copy = [...prev];
-      copy[idx] = { ...copy[idx], status: "free" };
-      return copy;
-    });
-  }, []);
+  }, [spots]);
 
   return {
     spots,
@@ -185,9 +229,6 @@ export function useParkingData() {
     entries,
     exits,
     currentPrice,
-    setSpotStatus,
-    reserveSpot,
-    cancelReservation,
     simulateEntry,
     simulateExit,
   };
