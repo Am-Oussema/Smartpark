@@ -204,7 +204,7 @@ export default function Landing() {
       </section>
 
       {/* Stack */}
-      <section id="stack" className="relative border-y border-border bg-secondary/20 py-24 overflow-hidden">
+      <section id="stack" className="relative border-y border-border bg-secondary/20 py-28 overflow-hidden">
         {/* Tech Grid Pattern */}
         <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
