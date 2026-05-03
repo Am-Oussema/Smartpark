@@ -53,6 +53,7 @@ export type Database = {
           daily_res_count: number
           daily_reset_at: string
           ban_until: string | null
+          ban_count: number
           updated_at: string
         }
         Insert: {
@@ -66,6 +67,7 @@ export type Database = {
           daily_res_count?: number
           daily_reset_at?: string
           ban_until?: string | null
+          ban_count?: number
           updated_at?: string
         }
         Update: {
@@ -79,6 +81,7 @@ export type Database = {
           daily_res_count?: number
           daily_reset_at?: string
           ban_until?: string | null
+          ban_count?: number
           updated_at?: string
         }
         Relationships: []
