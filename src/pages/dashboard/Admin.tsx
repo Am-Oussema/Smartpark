@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Settings2, Save, Loader2, Users,
   ShieldCheck, ShieldOff, Phone,
+  MailWarningIcon,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,8 @@ interface UserRow {
   trust_score: number;
   daily_res_count: number;
   created_at: string;
+  ban_until: string | null;
+  ban_count: number;
   role: string;
 }
 
@@ -89,9 +92,7 @@ export default function Admin() {
 
     const { data: profiles, error } = await supabase
       .from("profiles")
-      .select(
-        "id, email, full_name, phone, phone_verified, trust_score, daily_res_count, created_at"
-      )
+      .select("id, email, full_name, phone, phone_verified, trust_score, daily_res_count, created_at, ban_until, ban_count")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -113,11 +114,67 @@ export default function Admin() {
       trust_score: u.trust_score,
       daily_res_count: u.daily_res_count,
       created_at: u.created_at,
+      ban_until: u.ban_until,
+      ban_count: u.ban_count,
       role: roles?.find((r) => r.user_id === u.id)?.role ?? "user",
     }));
 
     setUsers(mapped);
     setLoadingUsers(false);
+  };
+
+  const [banDuration, setBanDuration] = useState<Record<string, string>>({});
+
+  const onBan = async (userId: string) => {
+    const duration = banDuration[userId] ?? "7";
+    const days = parseInt(duration);
+    const banUntil = days === -1
+      ? "2099-12-31T23:59:59Z"
+      : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+    // Get current ban_count
+    const { data: current } = await supabase
+      .from("profiles")
+      .select("ban_count")
+      .eq("id", userId)
+      .single();
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        ban_until: banUntil,
+        ban_count: (current?.ban_count ?? 0) + 1,
+      })
+      .eq("id", userId);
+
+    if (error) { toast.error("Échec", { description: error.message }); return; }
+    toast.success(`Utilisateur banni pour ${days === -1 ? "toujours" : `${days} jour(s)`}`);
+    loadUsers();
+  };
+
+  const onUnban = async (userId: string) => {
+    const { data: current } = await supabase
+      .from("profiles")
+      .select("trust_score")
+      .eq("id", userId)
+      .single();
+
+    const restoredScore = Math.max(25, current?.trust_score ?? 25);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        ban_until: null,
+        trust_score: restoredScore,
+      })
+      .eq("id", userId);
+
+    if (error) { toast.error("Échec", { description: error.message }); return; }
+    toast.success(
+      restoredScore <= 25
+        ? "Ban levé — score de confiance restauré à Prudent"
+        : `Ban levé — score de confiance maintenu (${restoredScore})`
+    );
+    loadUsers();
   };
 
   useEffect(() => {
@@ -324,12 +381,13 @@ export default function Admin() {
                     <th className="px-4 py-3">Rés. aujourd'hui</th>
                     <th className="px-4 py-3">Rôle</th>
                     <th className="px-4 py-3">Inscrit le</th>
+                    <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                         Aucun utilisateur trouvé
                       </td>
                     </tr>
@@ -342,6 +400,11 @@ export default function Admin() {
                         <td className="px-4 py-3">
                           <div className="font-medium">{u.full_name || "—"}</div>
                           <div className="text-xs text-muted-foreground">{u.email}</div>
+                          {u.ban_count > 0 && (
+                            <div className="text-xs text-destructive/70 mt-0.5">
+                              {u.ban_count} ban{u.ban_count > 1 ? "s" : ""} au total
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
@@ -382,6 +445,56 @@ export default function Admin() {
                         <td className="px-4 py-3 text-xs text-muted-foreground">
                           {format(new Date(u.created_at), "dd MMM yyyy", { locale: fr })}
                         </td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const isBanned = u.ban_until && new Date(u.ban_until) > new Date();
+                            if (u.role === "admin") return (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            );
+                            if (isBanned) return (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-destructive font-medium">
+                                  Banni jusqu'au{" "}
+                                  {new Date(u.ban_until!).getFullYear() > 2090
+                                    ? "∞"
+                                    : format(new Date(u.ban_until!), "dd MMM", { locale: fr })}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={() => onUnban(u.id)}
+                                >
+                                  Lever
+                                </Button>
+                              </div>
+                            );
+                            return (
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={banDuration[u.id] ?? "7"}
+                                  onChange={(e) =>
+                                    setBanDuration((prev) => ({ ...prev, [u.id]: e.target.value }))
+                                  }
+                                  className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground"
+                                >
+                                  <option value="1">1 jour</option>
+                                  <option value="7">7 jours</option>
+                                  <option value="30">30 jours</option>
+                                  <option value="-1">Permanent</option>
+                                </select>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 text-xs"
+                                  onClick={() => onBan(u.id)}
+                                >
+                                  Bannir
+                                </Button>
+                              </div>
+                            );
+                          })()}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -390,7 +503,7 @@ export default function Admin() {
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-right text-[var(--chart-3)]">
             {filtered.length} utilisateur{filtered.length !== 1 ? "s" : ""}
             {search ? " trouvé" + (filtered.length !== 1 ? "s" : "") : " au total"}
           </p>
