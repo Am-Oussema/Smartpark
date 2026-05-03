@@ -48,8 +48,8 @@ export default function Landing() {
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
             <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Fonctionnalités</a>
+            <a href="#experience" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Expérience</a>
             <a href="#stack" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Architecture</a>
-            <a href="#about" className="text-sm text-muted-foreground transition-colors hover:text-foreground">À propos</a>
           </nav>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -199,6 +199,75 @@ export default function Landing() {
                 <p className="text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Vision / Solution with the integrated image */}
+      <section id="experience" className="relative overflow-hidden bg-background py-24">
+        <div className="container relative z-10">
+          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+            {/* Image Side */}
+            <div className="relative order-2 lg:order-1">
+              {/* Decorative background glow */}
+              <div className="absolute -inset-4 rounded-3xl bg-gradient-primary opacity-20 blur-2xl" />
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="relative w-full rounded-2xl border border-border/50 object-cover shadow-2xl transition-transform duration-700 hover:scale-[1.02]"
+              >
+                <source src="/secure_sp.mp4" type="video/mp4" />
+              </video>
+              {/* Floating element for more charm */}
+              <div className="absolute -bottom-6 -right-6 rounded-xl border border-border bg-card/90 p-4 shadow-elegant backdrop-blur-md animate-fade-up" style={{ animationDelay: "0.5s" }}>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/20">
+                    <Car className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">Zéro stress</div>
+                    <div className="text-xs text-muted-foreground">Parking 100% garanti</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Text Side */}
+            <div className="order-1 lg:order-2">
+              <div className="mb-4 inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                <span className="mr-2 h-2 w-2 animate-pulse rounded-full bg-primary"></span>
+                Expérience premium
+              </div>
+              <h2 className="mb-6 text-3xl font-bold sm:text-4xl">
+                Une solution fluide et intelligente
+              </h2>
+              <p className="mb-8 text-lg text-muted-foreground">
+                L'application SmartPark redéfinit la façon dont vous stationnez. De la recherche de place en temps réel au paiement sur place en espèces, chaque étape a été pensée pour vous offrir un confort inégalé, avec des paiements automatisés prévus à l'avenir.
+              </p>
+
+              <ul className="space-y-4">
+                {[
+                  "Trouvez facilement une place disponible à proximité",
+                  "Consultez la disponibilité en temps réel sans effort",
+                  "Paiement sécurisé en espèces sur place (automatisation à venir)",
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                      <div className="h-2 w-2 rounded-full bg-primary" />
+                    </div>
+                    <span className="font-medium">{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Button asChild className="mt-8 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-90">
+                <Link to={user ? "/dashboard" : "/register"}>
+                  Rejoindre le mouvement <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
