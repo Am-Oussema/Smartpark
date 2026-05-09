@@ -49,7 +49,15 @@ Deno.serve(async (req) => {
 
     // ── Check 2: Not banned ───────────────────────────────
     if (profile.ban_until && new Date(profile.ban_until) > new Date()) {
-      return json({ error: "Compte suspendu temporairement" }, 403);
+      const isPermanent = new Date(profile.ban_until).getFullYear() > 2090;
+      const banDate = new Date(profile.ban_until).toLocaleDateString("fr-FR", {
+        day: "numeric", month: "long", year: "numeric"
+      });
+      return json({
+        error: isPermanent
+          ? "Compte suspendu définitivement — contactez le support"
+          : `Compte suspendu jusqu'au ${banDate}`,
+      }, 403);
     }
 
     // ── Check 3: Vehicle belongs to user ──────────────────
@@ -132,6 +140,11 @@ Deno.serve(async (req) => {
     if (claimError || !claimedSpots || claimedSpots.length === 0) {
       return json({ error: "Cette place vient d'être prise" }, 409);
     }
+
+    // ── Log occupied event ────────────────────────────────────────
+    await serviceClient
+      .from("spot_events")
+      .insert({ spot_id: spot_id, event: "occupied" });
 
     // ── Create reservation ────────────────────────────────
 
