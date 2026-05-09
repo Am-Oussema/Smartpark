@@ -64,9 +64,45 @@ export function useParkingData() {
       });
   }, []);
 
-  // Fetch initial spots — expires_at directly on parking_spots
+  // Fetch initial spots + sync spot_events on startup
   useEffect(() => {
     const init = async () => {
+
+      // Sync spot_events on startup — close any open occupied sessions
+      // where the spot is now free in parking_spots
+      const syncOnStartup = async () => {
+        const { data: freeSpots } = await supabase
+          .from("parking_spots")
+          .select("id")
+          .eq("status", "free");
+
+        if (!freeSpots || freeSpots.length === 0) return;
+
+        for (const spot of freeSpots) {
+          const { data: lastEvent } = await supabase
+            .from("spot_events")
+            .select("event, occurred_at")
+            .eq("spot_id", spot.id)
+            .order("occurred_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          // If last event was 'occupied' but spot is now free → close the session
+          if (lastEvent?.event === "occupied") {
+            await supabase
+              .from("spot_events")
+              .insert({
+                spot_id: spot.id,
+                event: "free",
+                occurred_at: new Date().toISOString(),
+              });
+          }
+        }
+      };
+
+      await syncOnStartup();
+
+      // Fetch current spots state
       const { data: spotsData } = await supabase
         .from("parking_spots")
         .select("id, status, expires_at")
@@ -105,12 +141,12 @@ export function useParkingData() {
             prev.map((s) =>
               s.id === updated.id
                 ? {
-                  ...s,
-                  status: mapStatus(updated.status),
-                  reservedUntil: updated.expires_at
-                    ? new Date(updated.expires_at).getTime()
-                    : undefined,
-                }
+                    ...s,
+                    status: mapStatus(updated.status),
+                    reservedUntil: updated.expires_at
+                      ? new Date(updated.expires_at).getTime()
+                      : undefined,
+                  }
                 : s
             )
           );
@@ -129,8 +165,8 @@ export function useParkingData() {
       setSpots((prev) =>
         prev.map((s) =>
           s.status === "reserved" &&
-            s.reservedUntil &&
-            s.reservedUntil < Date.now()
+          s.reservedUntil &&
+          s.reservedUntil < Date.now()
             ? { ...s, status: "free", reservedUntil: undefined }
             : s
         )
@@ -186,10 +222,7 @@ export function useParkingData() {
   // Simulate entry — admin dev tool
   const simulateEntry = useCallback(async () => {
     const freeSpot = spots.find((s) => s.status === "free");
-    if (!freeSpot) {
-      toast.error("Aucune place libre");
-      return;
-    }
+    if (!freeSpot) { toast.error("Aucune place libre"); return; }
     const { error } = await supabase
       .from("parking_spots")
       .update({ status: "occupied", last_updated: new Date().toISOString() })
@@ -198,16 +231,16 @@ export function useParkingData() {
       toast.error("Erreur simulate entry", { description: error.message });
       return;
     }
+    await supabase
+      .from("spot_events")
+      .insert({ spot_id: freeSpot.id, event: "occupied" });
     setEntries((e) => e + 1);
   }, [spots]);
 
   // Simulate exit — admin dev tool
   const simulateExit = useCallback(async () => {
     const occupiedSpot = spots.find((s) => s.status === "occupied");
-    if (!occupiedSpot) {
-      toast.error("Aucune place occupée");
-      return;
-    }
+    if (!occupiedSpot) { toast.error("Aucune place occupée"); return; }
     const { error } = await supabase
       .from("parking_spots")
       .update({ status: "free", last_updated: new Date().toISOString() })
@@ -216,6 +249,9 @@ export function useParkingData() {
       toast.error("Erreur simulate exit", { description: error.message });
       return;
     }
+    await supabase
+      .from("spot_events")
+      .insert({ spot_id: occupiedSpot.id, event: "free" });
     setExits((e) => e + 1);
   }, [spots]);
 
