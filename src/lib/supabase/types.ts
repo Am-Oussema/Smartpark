@@ -266,6 +266,27 @@ export type Database = {
         }
         Relationships: []
       }
+      spot_events: {
+        Row: {
+          id: string
+          spot_id: number
+          event: string
+          occurred_at: string
+        }
+        Insert: {
+          id?: string
+          spot_id: number
+          event: string
+          occurred_at?: string
+        }
+        Update: {
+          id?: string
+          spot_id?: number
+          event?: string
+          occurred_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
