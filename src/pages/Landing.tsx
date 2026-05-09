@@ -261,12 +261,6 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-
-              <Button asChild className="mt-8 bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-90">
-                <Link to={user ? "/dashboard" : "/register"}>
-                  Rejoindre le mouvement <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
             </div>
           </div>
         </div>
